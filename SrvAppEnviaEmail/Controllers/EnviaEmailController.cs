@@ -1,6 +1,7 @@
 ﻿using EnviaEmail.DATA.Model;
 using EnviaEmail.DATA.Repositories;
 using Microsoft.AspNetCore.Mvc;
+using System.Text.Json.Serialization;
 
 namespace SrvAppEnviaEmail.Controllers
 {
@@ -19,19 +20,34 @@ namespace SrvAppEnviaEmail.Controllers
             _EnviaEmailRepo = new EnviaEmailRepository(Configuration, hostingEnvironment);
 
         }
+
         [HttpPost]
         [Produces("application/json")]
-        public IActionResult SendEmail([FromBody] EnvioEmailModel model)
+
+        public ActionResult<bool> SendEmail([FromBody] EnvioEmailModel model)
         {
+
             _EnviaEmailRepo.SendEmail(model);
-            return Ok(new { enviado = true, de = model.From, para = model.To, assunto = model.Subject});
-        }        
-        
+            return Ok(new { enviado = true, para = model.To, assunto = model.Subject, anexo = model.attachmentName.Count() > 0 ? "Sim" : "Não" });
+        }
+
         [HttpPost]
-        public IActionResult SendEmailWithAttachment([FromBody] EnvioEmailAttachmentModel model)
+        public ActionResult<string> SaveAttachment([FromBody] SaveAttachmentModel model)
         {
-            _EnviaEmailRepo.SendEmail(model);
-            return Ok("Email Enviado");
+
+            if (ModelState.IsValid)
+            {
+                if (((model.base64.Length * 3 / 4)) > 2600000)
+                {
+                    return "Tamanho do arquivo acima do permitido (2,5mb).";
+                }
+                if (_EnviaEmailRepo.SaveAttachment(model))
+                {
+                    return Ok(new { upload = true });
+                };
+            }
+            return Ok(new { upload = false });
+
         }
 
     }
