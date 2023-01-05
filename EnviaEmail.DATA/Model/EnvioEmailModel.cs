@@ -12,15 +12,15 @@ namespace EnviaEmail.DATA.Model
     {
         //private string from = "noreply@policiamilitar.sp.gov.br";
         //public string From { get { return from; } set { from = value; } }
-        public string From = "xxxxxx@zxxxxx";
+        public string from = "xxxxxx@zxxxxx";
 
         [Required]
         [EnsureMaximumElements(500, ErrorMessage="Máximo de destinatários excedido, limite 500")]
-        public List<string> To { get; set; }
+        public List<string> to { get; set; }
         [Required]
-        public string Subject { get; set; }
+        public string subject { get; set; }
         [Required]
-        public string Body { get; set; }
+        public string body { get; set; }
         public string[]? attachmentName { get; set; }
     }
     public class EnsureMaximumElementsAttribute : ValidationAttribute

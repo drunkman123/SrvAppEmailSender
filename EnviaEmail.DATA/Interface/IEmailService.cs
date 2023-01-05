@@ -1,4 +1,5 @@
-﻿using System;
+﻿using EnviaEmail.DATA.Model;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -8,8 +9,9 @@ namespace EnviaEmail.DATA.Interface
 {
     public interface IEmailService
     {
-        bool SendEmail(string from, List<string> to, string subject, string body, string[]? attachment);
-        bool SaveAttachment(string base64, string fileName);
+        bool SendEmail(EnvioEmailModel model);
+        bool SaveAttachment(SaveAttachmentModel model);
         void DeleteAttachment(string attachmentPath);
+        string GenerateAndSendRandomToken(EmailTokenModel email);
     }
 }

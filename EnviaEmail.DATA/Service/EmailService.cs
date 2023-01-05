@@ -1,4 +1,6 @@
 ﻿using EnviaEmail.DATA.Interface;
+using EnviaEmail.DATA.Model;
+using EnviaEmail.DATA.Repositories;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using System;
@@ -6,6 +8,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Net.Mail;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -14,6 +17,7 @@ namespace EnviaEmail.DATA.Service
     public class EmailService : IEmailService
     {
         private readonly IHostEnvironment _hostingEnvironment;
+        private readonly EnviaEmailRepository _EnviaEmailRepo;
         private readonly string _smtp = "";
         private readonly string _user = "";
         private readonly string _pass = "";
@@ -21,12 +25,13 @@ namespace EnviaEmail.DATA.Service
         public EmailService(IConfiguration Configuration, IHostEnvironment hostingEnvironment)
         {
             _hostingEnvironment = hostingEnvironment;
+            _EnviaEmailRepo = new EnviaEmailRepository(Configuration, hostingEnvironment);
             _smtp = Configuration.GetValue<string>("smtp");
             _user = Configuration.GetValue<string>("user");
             _pass = Configuration.GetValue<string>("pass");
         }
 
-        public bool SendEmail(string from, List<string> to, string subject, string body, string[]? attachment)
+        public bool SendEmail(EnvioEmailModel model)
         {
             bool res = false;
             #region 
@@ -34,28 +39,28 @@ namespace EnviaEmail.DATA.Service
             MailMessage _mailMessage = new MailMessage();
 
             // Remetente
-            _mailMessage.From = new MailAddress(from);
+            _mailMessage.From = new MailAddress(model.from);
 
             // Destinatario
-            foreach (string em in to)
+            foreach (string em in model.to)
             {
                 _mailMessage.Bcc.Add(new MailAddress(em));
                 //_mailMessage.To.Add(em);
             }
             // Assunto
-            _mailMessage.Subject = subject;
+            _mailMessage.Subject = model.subject;
 
             // A mensagem é do tipo HTML ou Texto Puro?
             _mailMessage.IsBodyHtml = true;
 
             // Corpo da Mensagem
-            _mailMessage.Body = body;
+            _mailMessage.Body = model.body;
 
 
             ////Caminho do arquivo a ser enviado como anexo
-            if(attachment != null && attachment.Count() > 0)
+            if (model.attachmentName != null && model.attachmentName.Count() > 0)
             {
-                foreach (string em in attachment)
+                foreach (string em in model.attachmentName)
                 {
                     string arquivo = _hostingEnvironment.ContentRootPath + @"\tmp\" + em;
 
@@ -68,9 +73,9 @@ namespace EnviaEmail.DATA.Service
                         _mailMessage.Attachments.Add(Anexo);
                     }
                 }
-                
+
             }
-            
+
 
             //codificação do assunto do email para que os caracteres acentuados serem reconhecidos.
             _mailMessage.SubjectEncoding = Encoding.GetEncoding("ISO-8859-1");
@@ -99,44 +104,58 @@ namespace EnviaEmail.DATA.Service
             {
                 _smtpClient.Dispose();
                 _mailMessage.Dispose();
-                foreach (string em in attachment)
+                if (model.attachmentName != null)
                 {
-                    string arquivo = _hostingEnvironment.ContentRootPath + @"\tmp\" + em;
-                    DeleteAttachment(arquivo);
+                    foreach (string em in model.attachmentName)
+                    {
+                        string arquivo = _hostingEnvironment.ContentRootPath + @"\tmp\" + em;
+                        DeleteAttachment(arquivo);
+                    }
                 }
+
             }
             #endregion
 
             return res;
-            //Attachment attachment = new Attachment("path/to/attachment.pdf");
-            //message.Attachments.Add(attachment);
         }
-        public bool SaveAttachment(string base64, string fileName)
+        public bool SaveAttachment(SaveAttachmentModel model)
         {
             try
             {
                 // Decode the base64 string and get the binary data
-                byte[] data = Convert.FromBase64String(base64);
+                byte[] data = Convert.FromBase64String(model.base64);
 
                 // Create a new file and write the binary data to it
-                using (FileStream fileStream = File.Create(Path.Combine(_hostingEnvironment.ContentRootPath + "\\tmp\\" + fileName)))
+                using (FileStream fileStream = File.Create(Path.Combine(_hostingEnvironment.ContentRootPath + "\\tmp\\" + model.fileName)))
                 {
                     fileStream.Write(data, 0, data.Length);
                     fileStream.Flush();
                 }
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 throw;
             }
 
-           
+
             return true;
-        }        
-        
+        }
+
         public void DeleteAttachment(string attachmentPath)
         {
             File.Delete(attachmentPath);
+        }
+
+        public string GenerateAndSendRandomToken(EmailTokenModel model)
+        {
+            var token = _EnviaEmailRepo.InsertTokenAndEmailDB(model).token;
+
+            var emailModel = new EnvioEmailModel();
+            emailModel.to = new List<string> { model.email };
+            emailModel.body = $"<h2>O seu token para confirmação é {token}.<br>Caso não tenha solicitado, ignore esta mensagem.</h2>";
+            emailModel.subject = "Token de Confirmação";
+            SendEmail(emailModel);
+            return token;
         }
     }
 }
